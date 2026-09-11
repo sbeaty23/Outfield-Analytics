@@ -27,9 +27,9 @@ RUN groupadd --system --gid 1001 app \
 COPY --from=builder /install /usr/local
 
 USER app
-EXPOSE 8000
+EXPOSE port#
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://ip/api/health', timeout=2)"]
 
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", ip, "--port", port#]
