@@ -448,8 +448,8 @@ Current work includes:
 * [x] Initial repository structure
 * [x] `.gitignore` configuration
 * [x] Environment variable template
-* [ ] Next.js frontend setup
-* [ ] FastAPI backend setup
+* [x] Next.js frontend setup
+* [x] FastAPI backend setup
 * [ ] Frontend-to-backend communication
 * [ ] PostgreSQL setup
 * [ ] SQLAlchemy configuration
