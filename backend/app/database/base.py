@@ -1,4 +1,7 @@
-"""Placeholder for the future ORM declarative base and model metadata.
+"""Shared SQLAlchemy declarative base for application models."""
 
-No ORM is configured yet; importing this module does not require a database.
-"""
+from sqlalchemy.orm import DeclarativeBase
+
+
+class Base(DeclarativeBase):
+    pass

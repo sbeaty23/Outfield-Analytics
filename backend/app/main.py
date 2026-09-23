@@ -1,7 +1,8 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import health
-from app.core.config import APP_TITLE, APP_VERSION
+from app.core.config import APP_TITLE, APP_VERSION, settings
 from app.core.errors import handle_unexpected_error
 
 
@@ -11,6 +12,12 @@ def create_app() -> FastAPI:
         version=APP_VERSION,
     )
 
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_methods=["GET"],
+        allow_headers=["Accept", "Content-Type"],
+    )
     application.add_exception_handler(Exception, handle_unexpected_error)
     application.include_router(health.router, prefix="/api")
 

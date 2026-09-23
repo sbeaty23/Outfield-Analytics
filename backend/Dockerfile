@@ -11,6 +11,8 @@ RUN pip install --prefix=/install .
 FROM builder AS test
 
 RUN pip install ".[test]"
+COPY alembic.ini ./alembic.ini
+COPY alembic ./alembic
 COPY tests ./tests
 RUN pytest --quiet
 
@@ -25,11 +27,12 @@ RUN groupadd --system --gid 1001 app \
     && useradd --system --uid 1001 --gid app --no-create-home app
 
 COPY --from=builder /install /usr/local
+COPY alembic.ini ./alembic.ini
+COPY alembic ./alembic
 
 USER app
-EXPOSE port#
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://ip/api/health', timeout=2)"]
+    CMD ["python", "-c", "import os, urllib.request; urllib.request.urlopen(f\"http://localhost:{os.environ['BACKEND_PORT']}/api/health\", timeout=2)"]
 
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", port#]
+CMD ["sh", "-c", "exec python -m uvicorn app.main:app --host \"$BACKEND_HOST\" --port \"$BACKEND_PORT\""]

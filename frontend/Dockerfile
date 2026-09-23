@@ -1,29 +1,11 @@
-FROM node:24-alpine AS dependencies
+FROM node:24-alpine
+
 WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:24-alpine AS builder
-WORKDIR /app
-ENV NEXT_TELEMETRY_DISABLED=1
-COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
 
-FROM node:24-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV HOSTNAME=ip
-ENV PORT=port#
-
-RUN addgroup --system --gid 1001 nodejs \
-  && adduser --system --uid 1001 nextjs
-
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-USER nextjs
-EXPOSE port#
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "exec npm run dev -- --hostname \"$FRONTEND_HOST\" --port \"$FRONTEND_PORT\""]

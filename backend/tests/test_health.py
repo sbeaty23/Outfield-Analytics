@@ -1,17 +1,63 @@
 from fastapi.testclient import TestClient
 
+from app.api import health
 from app.main import create_app
 
 
-def test_health_returns_ok() -> None:
+def test_health_reports_unavailable_database(monkeypatch) -> None:
+    monkeypatch.setattr(health, "is_database_connected", lambda: False)
+
+    with TestClient(create_app()) as client:
+        response = client.get("/api/health")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "status": "degraded",
+        "database": "unavailable",
+    }
+
+
+def test_health_reports_connected_database(monkeypatch) -> None:
+    monkeypatch.setattr(health, "is_database_connected", lambda: True)
+
     with TestClient(create_app()) as client:
         response = client.get("/api/health")
 
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "database": "not_configured",
+        "database": "connected",
     }
+
+
+def test_health_allows_development_frontend_origin() -> None:
+    with TestClient(create_app()) as client:
+        response = client.options(
+            "/api/health",
+            headers={
+                "Origin": "http://frontend.test",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == (
+        "http://frontend.test"
+    )
+
+
+def test_health_rejects_unconfigured_origins() -> None:
+    with TestClient(create_app()) as client:
+        response = client.options(
+            "/api/health",
+            headers={
+                "Origin": "https://unconfigured.example",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers
 
 
 def test_unknown_route_returns_not_found() -> None:
