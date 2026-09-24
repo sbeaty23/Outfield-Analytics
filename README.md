@@ -1,502 +1,88 @@
 # Outfield Analytics
 
-Outfield Analytics is a full-stack baseball analytics and machine-learning platform designed to combine current-season baseball data with historical datasets to provide team information, player statistics, schedules, trend analysis, projected depth charts, and game predictions.
+An independent baseball analytics project. The goal is to combine current-season information with historical data, calculate useful statistics, and eventually predict upcoming games. This is a portfolio project under active development, not a production service.
 
-The project is being built as a portfolio project to demonstrate practical experience with full-stack development, backend API design, relational databases, data engineering, machine learning, testing, containerization, and deployment.
+## What the app will do
 
-## Project Goal
+- **Teams:** Records, standings, run differential, recent form, scoring trends, rosters, coaches, and schedules.
+- **Players and stats:** Player pages and sortable batting, pitching, and fielding tables. The app will calculate metrics such as AVG, OBP, SLG, OPS, ERA, WHIP, and rolling trends.
+- **Depth charts:** Project likely starters from recent starts, appearances, and positional usage. These will be labeled as projections, not official depth charts.
+- **Game predictions:** Estimate each team's win probability using recent form, run differential, offense, pitching, home field, rest, and available starter information. Logistic regression is the baseline; tree-based models may follow.
+- **Model Lab:** Show backtest results, calibration, accuracy, ROC-AUC, Brier score, and log loss. Training and evaluation will use chronological splits.
 
-The goal of Outfield Analytics is to create an independent baseball analytics application that provides:
+The app will do more than display data from another API. It will normalize source data, calculate its own metrics, and explain how its projections perform.
 
-* Current team and player information
-* Current-season statistics and standings
-* Team rosters and coaching staff
-* Team schedules
-* Interactive statistical dashboards
-* Historical performance analysis
-* Projected depth charts based on player usage
-* Machine-learning predictions for upcoming games
-* Model evaluation and backtesting tools
+## Data and architecture
 
-The project is intended to go beyond simply displaying API data. The application will calculate its own advanced statistics, rolling trends, projections, and prediction features from the underlying data.
-
-## Planned Features
-
-### Team Overview
-
-Each team will have an overview page containing information such as:
-
-* Team record
-* Winning percentage
-* Division and league
-* Division ranking
-* Run differential
-* Recent record
-* Runs scored per game
-* Runs allowed per game
-* Offensive and pitching trends
-
-Interactive charts will be used to visualize performance over time.
-
-### Roster
-
-The roster section will display the current team roster grouped by position.
-
-Player information may include:
-
-* Name
-* Position
-* Bats / Throws
-* Current-season statistics
-
-Players will also have individual profile pages containing season statistics and performance trends.
-
-### Coaching Staff
-
-The staff section will display current managers and coaches when that information is available from the selected data source.
-
-### Statistics
-
-The statistics section will provide sortable and filterable tables for:
-
-* Batting
-* Pitching
-* Fielding
-
-In addition to source statistics, Outfield Analytics will calculate additional metrics such as:
-
-* AVG
-* OBP
-* SLG
-* OPS
-* ERA
-* WHIP
-* K/9
-* BB/9
-* HR/9
-* Run differential
-* Rolling team performance
-
-### Projected Depth Chart
-
-Outfield Analytics will generate its own projected depth chart based on player usage.
-
-Factors may include:
-
-* Recent starts
-* Season starts
-* Recent appearances
-* Positional usage
-
-The generated depth chart will be clearly labeled as a projection rather than an official team depth chart.
-
-### Schedule
-
-The schedule section will display current and upcoming games along with historical results.
-
-Current-season schedule data will be requested only when needed and cached by the backend.
-
-### Game Predictions
-
-A machine-learning model will estimate the probability of each team winning an upcoming game.
-
-Potential prediction features include:
-
-* Season winning percentage
-* Recent win percentage
-* Run differential
-* Offensive performance
-* Pitching performance
-* Recent team form
-* Home-field advantage
-* Rest days
-* Starting pitching information
-
-The initial model will use logistic regression as a baseline before being compared with other models such as:
-
-* Random Forest
-* Gradient Boosting
-* XGBoost
-
-### Model Lab
-
-The Model Lab will provide information about how the prediction models perform.
-
-Metrics may include:
-
-* Accuracy
-* ROC-AUC
-* Brier Score
-* Log Loss
-* Calibration
-
-Models will be trained and evaluated using chronological data splits to better simulate real-world prediction.
-
-## Data Sources
-
-Outfield Analytics uses a hybrid data strategy.
-
-### Current-Season Data
-
-Current-season information will be retrieved through MLB's publicly accessible statistics endpoints.
-
-This data will only be used for narrow, non-bulk requests such as:
-
-* Current rosters
-* Current player statistics
-* Current team statistics
-* Standings
-* Coaching staff
-* Current and upcoming schedules
-
-Requests will be made through the Outfield Analytics backend rather than directly from the browser.
-
-Responses will be cached to reduce unnecessary requests.
-
-### Historical Data
-
-Historical baseball data used for analytics, machine-learning training, validation, and backtesting will primarily come from Retrosheet.
-
-Historical datasets may include:
-
-* Games
-* Team statistics
-* Player statistics
-* Batting statistics
-* Pitching statistics
-* Rosters
-* Historical schedules
-
-Retrosheet data will be processed through a custom ETL pipeline and stored in PostgreSQL.
-
-Required Retrosheet attribution will be included in the deployed application.
-
-## Data Usage
-
-Outfield Analytics is an independent, non-commercial portfolio project.
-
-The project will not include:
-
-* MLB logos
-* Team logos
-* Official player photographs
-* Broadcast video or audio
-* MLB articles or editorial content
-* A live game feed
-* Bulk redistribution of MLB data
-
-The application is not affiliated with, endorsed by, sponsored by, or operated by Major League Baseball or any MLB club.
-
-## Architecture
-
-The planned application architecture is:
+Current-season rosters, stats, standings, coaching staff, and schedules will come from narrow requests to MLB's public statistics endpoints. The backend will request and cache that data; the browser will not call the provider directly. Historical games and statistics will primarily come from Retrosheet, processed into PostgreSQL for analysis and model training. The deployed app will include Retrosheet attribution.
 
 ```text
-                    Outfield Analytics
-                           |
-              +------------+------------+
-              |                         |
-           Next.js                   FastAPI
-        React / TypeScript              |
-                                        |
-                         +--------------+--------------+
-                         |              |              |
-                       Redis        PostgreSQL      ML Layer
-                         |              |              |
-                         |              |        scikit-learn
-                         |              |
-                         +------+-------+
-                                |
-                     +----------+----------+
-                     |                     |
-                MLB Current            Retrosheet
-                   Data              Historical Data
+Browser → Next.js / React → FastAPI → PostgreSQL
+                           ├──────→ MLB current-season data (planned)
+                           ├──────→ Redis cache (planned)
+                           └──────→ analytics and ML (planned)
 ```
 
-The frontend will never communicate directly with external baseball data providers.
+The frontend uses Next.js, React, TypeScript, and Tailwind CSS. The backend uses Python, FastAPI, Pydantic, SQLAlchemy, and Alembic. PostgreSQL stores application and historical data. The test stack is pytest, Vitest, and React Testing Library. Later work may use pandas, NumPy, scikit-learn, XGBoost, and Recharts. Planned deployment is Vercel for the frontend and Railway or Render for the backend, with hosted PostgreSQL and Redis.
 
-Instead:
+This is a non-commercial, independent project. It will not use MLB or team logos, official player photos, broadcast media, MLB articles, a live game feed, or bulk redistribution of MLB data. It is not affiliated with MLB or any club.
 
-```text
-Browser
-   |
-Next.js
-   |
-FastAPI
-   |
-Data Provider / Database
-```
+## Run locally
 
-This keeps external data access, caching, normalization, and error handling centralized in the backend.
+Start Docker Desktop with its Linux engine enabled. From the repository root in PowerShell:
 
-## Technology Stack
+```powershell
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+# Fill the placeholders in .env with your local ports, bind addresses, and credentials.
+docker compose config --quiet
+docker compose up --build
 
-### Frontend
-
-* Next.js
-* React
-* TypeScript
-* Tailwind CSS
-* Recharts
-
-### Backend
-
-* Python
-* FastAPI
-* Pydantic
-* SQLAlchemy
-* Alembic
-
-### Database
-
-* PostgreSQL
-
-### Data Processing
-
-* pandas
-* NumPy
-
-### Machine Learning
-
-* scikit-learn
-* XGBoost planned for later experimentation
-
-### Infrastructure
-
-* Docker
-* Docker Compose
-* Redis
-* GitHub Actions
-
-### Testing
-
-* pytest
-* Vitest
-* React Testing Library
-
-### Planned Deployment
-
-* Vercel — frontend
-* Railway or Render — backend
-* PostgreSQL — application and analytics database
-* Redis — caching
-
-## Repository Structure
-
-The planned repository structure is:
-
-```text
-Outfield-analytics/
-|
-├── frontend/
-|   ├── app/
-|   ├── components/
-|   ├── hooks/
-|   ├── services/
-|   ├── types/
-|   └── utils/
-|
-├── backend/
-|   ├── app/
-|   |   ├── api/
-|   |   ├── providers/
-|   |   ├── services/
-|   |   ├── models/
-|   |   ├── schemas/
-|   |   ├── database/
-|   |   └── main.py
-|   └── tests/
-|
-├── ingestion/
-|   ├── retrosheet/
-|   └── transforms/
-|
-├── ml/
-|   ├── features/
-|   ├── training/
-|   ├── evaluation/
-|   ├── models/
-|   └── notebooks/
-|
-├── docs/
-|
-├── .github/
-|   └── workflows/
-|
-├── docker-compose.yml
-├── .env.example
-├── .gitignore
-└── README.md
-```
-
-## Development Roadmap
-
-The project will be developed in several phases.
-
-### Phase 1 — Application Foundation
-
-Set up the core application infrastructure.
-
-Tasks include:
-
-* Initialize the Next.js frontend
-* Initialize the FastAPI backend
-* Configure PostgreSQL
-* Configure SQLAlchemy
-* Configure Alembic database migrations
-* Connect the frontend to the backend
-* Connect the backend to PostgreSQL
-* Add Docker and Docker Compose
-* Add basic frontend and backend testing
-* Add linting
-* Add basic GitHub Actions CI
-* Create project documentation
-
-### Phase 2 — Current Baseball Data
-
-Integrate current-season baseball information.
-
-Planned work includes:
-
-* Team data
-* Team details
-* Rosters
-* Current statistics
-* Schedules
-* Standings
-* Data normalization
-
-### Phase 3 — Caching and Reliability
-
-Add:
-
-* Redis
-* API caching
-* Rate limiting
-* Error handling
-* Cached fallback data
-
-### Phase 4 — Initial User Interface
-
-Build:
-
-* Team selector
-* Overview
-* Roster
-* Stats
-* Schedule
-
-This will become the first publicly deployable version of the project.
-
-### Phase 5 — Historical Data Pipeline
-
-Create the Retrosheet ETL pipeline and historical PostgreSQL dataset.
-
-### Phase 6 — Analytics
-
-Add:
-
-* Rolling statistics
-* Performance trends
-* Player pages
-* Interactive charts
-* Projected depth charts
-
-### Phase 7 — Machine Learning
-
-Build:
-
-* Feature generation
-* Training datasets
-* Logistic regression baseline
-* Prediction service
-
-### Phase 8 — Model Evaluation
-
-Add:
-
-* Historical backtesting
-* Chronological validation
-* Calibration analysis
-* Model comparisons
-* Model Lab
-
-### Phase 9 — Upcoming Game Predictions
-
-Combine the trained historical model with current-season statistics to generate predictions for upcoming games.
-
-### Phase 10 — Production Polish
-
-Complete:
-
-* Automated testing
-* CI/CD
-* Documentation
-* Logging
-* Production deployment
-* Performance optimization
-
-## Current Status
-
-**Current Phase: Phase 1 — Application Foundation**
-
-The project is currently focused on establishing the full-stack development environment before integrating baseball data.
-
-Current work includes:
-
-* [x] Project planning
-* [x] Initial repository structure
-* [x] `.gitignore` configuration
-* [x] Environment variable template
-* [x] Next.js frontend setup
-* [x] FastAPI backend setup
-* [ ] Frontend-to-backend communication
-* [ ] PostgreSQL setup
-* [ ] SQLAlchemy configuration
-* [ ] Alembic migration setup
-* [ ] Docker configuration
-* [ ] Backend tests
-* [ ] Frontend tests
-* [ ] CI workflow
-
-Phase 1 will be considered complete when the following request path works reliably:
-
-```text
-Browser
-   |
-Next.js
-   |
-FastAPI
-   |
-PostgreSQL
-```
-
-The entire local development environment should eventually be startable with:
-
-```bash
+# Later starts:
 docker compose up
 ```
 
-## Phase 1 Target
+Keep real values in the ignored `.env`. Set `DATABASE_URL` to use the `db` service and the same database, user, password, and port as the PostgreSQL variables. Set `FRONTEND_URL` to the browser's frontend origin and `NEXT_PUBLIC_API_URL` to its backend origin. For frontend work outside Docker, create `frontend/.env.local` from `frontend/.env.example` and fill its placeholder. PostgreSQL initialization variables apply when a new data volume is created; changing them does not update an existing database.
 
-The initial application will include a simple system-status page confirming that each major service is operational.
-
-Example:
+Open `FRONTEND_URL` to see the system-status page. React calls `GET /api/health` through `NEXT_PUBLIC_API_URL` and displays the result:
 
 ```text
-Outfield Analytics
-
-System Status
-
-Frontend      Online
-Backend       Connected
-Database      Connected
+PostgreSQL healthy → migrations run → FastAPI healthy → frontend starts
+Browser → health request → FastAPI runs SELECT 1 → React shows status
 ```
 
-Once this works consistently, development will move to Phase 2 and begin integrating current-season baseball data.
+An HTTP `200` means the backend and database are connected. An HTTP `503` means the backend is reachable but PostgreSQL is unavailable. If the API cannot be reached, the page shows Backend **Unavailable** and Database **Unknown**. Use **Refresh status** to check again. Compose waits for healthy dependencies at startup; it does not automatically restart a service that later becomes unhealthy.
 
-## Project Status
+Inside Compose, the backend reaches PostgreSQL at `db:<postgres-port>`, and containers reach FastAPI at `backend:<backend-port>`. Your browser uses the published host ports. `localhost` inside a container refers to that container. Set `POSTGRES_BIND_HOST` to a loopback address if local database tools should be the only host clients.
 
-Outfield Analytics is currently under active development and is not yet ready for production use.
+## Check the stack
 
-Features, architecture, database schemas, and prediction methodology may change as development continues.
+```powershell
+docker compose ps
+docker compose logs db backend frontend
+```
+
+Open `NEXT_PUBLIC_API_URL` plus `/api/health`. A healthy response is `{"status":"ok","database":"connected"}`, and the page should show Frontend **Online**, Backend **Connected**, and Database **Connected**. To check recovery, stop the backend with `docker compose stop backend`, refresh the page, then run `docker compose start backend` and refresh again. Stop and restart `db` the same way to check the degraded database state.
+
+`docker compose down` keeps the named PostgreSQL volume. Avoid `down -v` unless you intend to remove stored data.
+
+Run the code checks from their respective directories:
+
+| Directory | Commands |
+| --- | --- |
+| `backend/` | `python -m pytest --quiet` |
+| `frontend/` | `npm test`, `npm run lint`, `npx tsc --noEmit` |
+
+## Roadmap and current status
+
+1. **Foundation:** Next.js, FastAPI, PostgreSQL, migrations, Compose, a live status page, and basic tests.
+2. **Current data:** Teams, rosters, stats, schedules, standings, and normalization.
+3. **Reliability:** Redis caching, rate limits, error handling, and cached fallback data.
+4. **First full UI:** Team selection, overview, roster, stats, and schedule. This is the first planned public release.
+5. **Historical data:** Retrosheet ingestion and PostgreSQL datasets.
+6. **Analytics:** Rolling metrics, player pages, trends, charts, and projected depth charts.
+7. **Prediction model:** Features, training data, a logistic regression baseline, and a prediction service.
+8. **Evaluation:** Chronological backtests, calibration, model comparisons, and Model Lab.
+9. **Upcoming games:** Combine the historical model with current-season inputs.
+10. **Production polish:** CI/CD, monitoring, logging, documentation, and performance.
+
+Phase 1 is in progress. The app, database, migrations, Compose startup, health query, container networking, CORS, and backend outage/recovery have been checked locally. Backend and frontend tests pass. CI, visual browser confirmation, and database persistence after container recreation are still pending. Features and model choices may change as the project develops.

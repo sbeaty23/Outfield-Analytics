@@ -104,10 +104,37 @@ h1 {
   background: rgba(7, 17, 13, 0.52);
 }
 
-.status-panel h2 {
-  margin: 0;
+.status-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--border);
+}
+
+.status-refresh {
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.35rem;
+  color: var(--text);
+  background: var(--surface-raised);
+  cursor: pointer;
+}
+
+.status-refresh:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.status-refresh:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.status-panel h2 {
+  margin: 0;
   font-size: 0.82rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -151,11 +178,23 @@ h1 {
   height: 1.35rem;
   display: inline-grid;
   place-items: center;
-  border: 1px solid rgba(110, 231, 164, 0.45);
+  border: 1px solid currentColor;
   border-radius: 50%;
-  background: var(--accent-soft);
+  background: transparent;
   font-size: 0.8rem;
   line-height: 1;
+}
+
+.service-state[data-state="unhealthy"] {
+  color: #fca5a5;
+}
+
+.service-state[data-state="loading"] {
+  color: #fde68a;
+}
+
+.service-state[data-state="unknown"] {
+  color: var(--muted);
 }
 
 @media (max-width: 30rem) {
@@ -169,7 +208,7 @@ h1 {
   }
 
   .status-row,
-  .status-panel h2 {
+  .status-heading {
     padding-right: 1rem;
     padding-left: 1rem;
   }

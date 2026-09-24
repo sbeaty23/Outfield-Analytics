@@ -1,9 +1,6 @@
 import { SystemStatusPanel } from "@/components/system-status-panel";
-import { getSystemStatus } from "@/lib/api";
 
-export default async function Home() {
-  const statuses = await getSystemStatus();
-
+export default function Home() {
   return (
     <main className="page-shell">
       <section className="diagnostic-card" aria-labelledby="page-title">
@@ -19,7 +16,7 @@ export default async function Home() {
 
         <p className="intro">Baseball analytics and predictive modeling.</p>
 
-        <SystemStatusPanel statuses={statuses} />
+        <SystemStatusPanel />
       </section>
     </main>
   );
