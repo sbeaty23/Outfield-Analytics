@@ -10,6 +10,7 @@ from app.core.config import APP_TITLE, APP_VERSION, settings
 from app.core.errors import handle_unexpected_error, handle_validation_error
 from app.core.logging import RequestLoggingMiddleware, configure_logging
 from app.database.session import engine
+from app.schemas.error import ErrorResponse
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,10 @@ def create_app() -> FastAPI:
         title=APP_TITLE,
         version=APP_VERSION,
         lifespan=lifespan,
+        responses={
+            422: {"model": ErrorResponse, "description": "Request validation failed."},
+            500: {"model": ErrorResponse, "description": "Internal server error."},
+        },
     )
 
     application.add_middleware(RequestLoggingMiddleware)

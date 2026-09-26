@@ -21,10 +21,11 @@ function service(name: string) {
 
 function healthResponse(status: number, database: "connected" | "unavailable") {
   return new Response(
-    JSON.stringify({
-      status: status === 200 ? "ok" : "degraded",
-      database,
-    }),
+    JSON.stringify(
+      status === 200
+        ? { status: "ok", database }
+        : { detail: "Database unavailable" },
+    ),
     { status },
   );
 }

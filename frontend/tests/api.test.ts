@@ -38,7 +38,7 @@ test("healthy API uses the browser URL, disables caching, and reports connected 
 });
 
 test("degraded API reports a connected backend and unavailable database", async () => {
-  mockResponse(503, { status: "degraded", database: "unavailable" });
+  mockResponse(503, { detail: "Database unavailable" });
   const result = await getSystemStatus();
   expect(result.map(({ label }) => label)).toEqual([
     "Online",
@@ -49,6 +49,9 @@ test("degraded API reports a connected backend and unavailable database", async 
 });
 
 test.each([
+  [200, { detail: "Database unavailable" }],
+  [503, { detail: "Service unavailable" }],
+  [503, { status: "degraded", database: "unavailable" }],
   [200, { status: "degraded", database: "unavailable" }],
   [503, { status: "ok", database: "connected" }],
   [500, { status: "ok", database: "connected" }],

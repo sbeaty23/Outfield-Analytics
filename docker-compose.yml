@@ -3,35 +3,41 @@ name: outfield-analytics
 services:
   db:
     image: postgres:17-alpine
-    ports:
-      - "${POSTGRES_BIND_HOST}:${POSTGRES_PORT}:${POSTGRES_PORT}"
+    networks:
+      - database
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_PORT: ${POSTGRES_PORT}
-    command: ["postgres", "-c", "port=${POSTGRES_PORT}"]
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in your private environment}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in your private environment}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your private environment}
+      POSTGRES_PORT: ${POSTGRES_PORT:?Set POSTGRES_PORT in your private environment}
+    command: ["postgres", "-c", "port=${POSTGRES_PORT:?Set POSTGRES_PORT in your private environment}"]
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test:
         - CMD-SHELL
-        - 'pg_isready -h localhost -p "$$POSTGRES_PORT" -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+        - 'pg_isready -p "$$POSTGRES_PORT" -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
       interval: 5s
       timeout: 5s
       start_period: 10s
       retries: 10
 
   backend:
+    networks:
+      - default
+      - database
     build:
       context: ./backend
     env_file:
       - .env
     ports:
-      - "${BACKEND_PORT}:${BACKEND_PORT}"
+      - "${BACKEND_PORT:?Set BACKEND_PORT in your private environment}:${BACKEND_PORT:?Set BACKEND_PORT in your private environment}"
     environment:
-      BACKEND_HOST: ${BACKEND_HOST}
-      BACKEND_PORT: ${BACKEND_PORT}
+      BACKEND_HOST: ${BACKEND_HOST:?Set BACKEND_HOST in your private environment}
+      BACKEND_PORT: ${BACKEND_PORT:?Set BACKEND_PORT in your private environment}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in your private environment}
+      ENVIRONMENT: ${ENVIRONMENT:?Set ENVIRONMENT in your private environment}
+      FRONTEND_URL: ${FRONTEND_URL:?Set FRONTEND_URL in your private environment}
       WATCHFILES_FORCE_POLLING: "true"
     volumes:
       - ./backend/app:/app/app:ro
@@ -48,13 +54,13 @@ services:
     build:
       context: ./frontend
     environment:
-      FRONTEND_HOST: ${FRONTEND_HOST}
-      FRONTEND_PORT: ${FRONTEND_PORT}
-      BACKEND_PORT: ${BACKEND_PORT}
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      FRONTEND_HOST: ${FRONTEND_HOST:?Set FRONTEND_HOST in your private environment}
+      FRONTEND_PORT: ${FRONTEND_PORT:?Set FRONTEND_PORT in your private environment}
+      BACKEND_PORT: ${BACKEND_PORT:?Set BACKEND_PORT in your private environment}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?Set NEXT_PUBLIC_API_URL in your private environment}
       WATCHPACK_POLLING: "true"
     ports:
-      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
+      - "${FRONTEND_PORT:?Set FRONTEND_PORT in your private environment}:${FRONTEND_PORT:?Set FRONTEND_PORT in your private environment}"
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
@@ -62,6 +68,10 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+
+networks:
+  database:
+    internal: true
 
 volumes:
   postgres_data:
