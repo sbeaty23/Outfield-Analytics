@@ -19,22 +19,19 @@ export async function getSystemStatus(
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
     const body: unknown = await response.json();
-    if (
-      !body ||
-      typeof body !== "object" ||
-      !("status" in body) ||
-      !("database" in body)
-    ) {
+    if (!body || typeof body !== "object") {
       throw new Error("Invalid health response");
     }
     const connected =
       response.status === 200 &&
+      "status" in body &&
+      "database" in body &&
       body.status === "ok" &&
       body.database === "connected";
     const unavailable =
       response.status === 503 &&
-      body.status === "degraded" &&
-      body.database === "unavailable";
+      "detail" in body &&
+      body.detail === "Database unavailable";
     if (!connected && !unavailable)
       throw new Error("Unexpected health response");
 

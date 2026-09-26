@@ -7,8 +7,10 @@ and historical data, calculated statistics, and future game predictions.
 
 The Phase 1 foundation includes a system-status page, database health checks,
 Alembic migrations, Docker Compose, tests, linting, formatting, structured errors,
-logging, and GitHub Actions configuration. Hosted CI, browser verification, and
-database persistence checks remain pending for the first milestone.
+logging, and GitHub Actions configuration. Live service and database persistence
+checks pass, and existing remote commits have successful hosted CI runs. Final
+browser sign-off and hosted CI for the latest local changes remain pending.
+See the [Phase 1 verification report](docs/phase1-verification.md).
 
 **Stack:** Next.js / React, TypeScript, Tailwind CSS, FastAPI, SQLAlchemy, and
 PostgreSQL. The browser communicates with FastAPI through REST/JSON.
@@ -24,7 +26,7 @@ root in PowerShell:
 
 ```powershell
 if (!(Test-Path .env)) { Copy-Item .env.example .env }
-# Replace the placeholders in .env with your local configuration.
+# Fill every blank in .env with your private local configuration.
 docker compose config --quiet
 docker compose up --build
 ```
@@ -35,7 +37,17 @@ origin. Open `FRONTEND_URL` to view the system-status page.
 
 Keep credentials in ignored environment files. Never put secrets in public files
 or `NEXT_PUBLIC_*` variables. For frontend work outside Docker, copy
-`frontend/.env.example` to `frontend/.env.local` and fill its placeholder.
+`frontend/.env.example` to `frontend/.env.local` and adjust the API origin.
+
+Tracked configuration uses environment variables with no literal IP addresses,
+ports, or credentials. Compose rejects missing required configuration. Run
+`python scripts/check_public_config.py` before committing; CI enforces the same
+check. See [private configuration](docs/development.md#private-configuration).
+
+PostgreSQL has no published host port and is reachable only on the private
+database network by the backend. Keep it private in future deployments too.
+Phase 1 adds no authentication, Redis, or baseball models; see the
+[API conventions and scope](docs/architecture.md#api-response-conventions).
 
 ## Verify
 
