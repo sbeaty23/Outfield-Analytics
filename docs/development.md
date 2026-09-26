@@ -50,8 +50,8 @@ or diagnosing a fresh setup; verify each layer before adding the next.
 | Step | Increment | Verification before committing |
 | --- | --- | --- |
 | 1 | Repository, folders, README, ignore rules | Inspect tracked files for secrets. |
-| 2 | Next.js, TypeScript, Tailwind, homepage | Open the configured frontend URL (typically localhost:3000). |
-| 3 | FastAPI and `/api/health` | Request the configured backend URL (typically localhost:8000/api/health). |
+| 2 | Next.js, TypeScript, Tailwind, homepage | Open `FRONTEND_URL` from your local environment. |
+| 3 | FastAPI and `/api/health` | Request `NEXT_PUBLIC_API_URL` plus `/api/health`. |
 | 4 | `frontend/lib/api.ts` | Confirm the browser receives the backend response. |
 | 5 | PostgreSQL and SQLAlchemy session | Confirm a database connection. |
 | 6 | Alembic and initial table | Run `alembic upgrade head` and inspect `system_metadata`. |
@@ -64,11 +64,18 @@ or diagnosing a fresh setup; verify each layer before adding the next.
 
 ## First milestone: v0.1.0
 
+For manual recovery checks, open the system-status page, stop the backend with
+`docker compose stop backend`, and refresh to confirm it shows unavailable.
+Run `docker compose start backend` and refresh to confirm recovery. Repeat with
+`db` to check the degraded database state and recovery. PostgreSQL initialization
+variables only apply to a new data volume; changing them does not update an
+existing database.
+
 The tag identifies the initial foundation, not a production release. A local tag
 can record the code milestone while hosted CI and manual checks remain pending.
 Before publishing it, after the feature branch is merged and GitHub CI passes on
 `main`, run the manual browser
-health/recovery checks in the README and confirm database data persists after
+health/recovery checks above and confirm database data persists after
 container recreation. Use `docker compose down` without `-v` to preserve data.
 
 If no local milestone tag exists yet, tag the verified commit, then publish it:
