@@ -41,9 +41,7 @@ def test_health_allows_development_frontend_origin() -> None:
         )
 
     assert response.status_code == 200
-    assert response.headers["access-control-allow-origin"] == (
-        "http://frontend.test"
-    )
+    assert response.headers["access-control-allow-origin"] == ("http://frontend.test")
 
 
 def test_health_rejects_unconfigured_origins() -> None:

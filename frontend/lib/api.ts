@@ -6,7 +6,9 @@ export const initialStatuses = [
   { service: "Database", label: "Checking", state: "loading" },
 ] as const satisfies readonly SystemStatus[];
 
-export async function getSystemStatus(signal?: AbortSignal): Promise<readonly SystemStatus[]> {
+export async function getSystemStatus(
+  signal?: AbortSignal,
+): Promise<readonly SystemStatus[]> {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
     if (!apiUrl) throw new Error("API URL is missing");
@@ -17,12 +19,24 @@ export async function getSystemStatus(signal?: AbortSignal): Promise<readonly Sy
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
     const body: unknown = await response.json();
-    if (!body || typeof body !== "object" || !("status" in body) || !("database" in body)) {
+    if (
+      !body ||
+      typeof body !== "object" ||
+      !("status" in body) ||
+      !("database" in body)
+    ) {
       throw new Error("Invalid health response");
     }
-    const connected = response.status === 200 && body.status === "ok" && body.database === "connected";
-    const unavailable = response.status === 503 && body.status === "degraded" && body.database === "unavailable";
-    if (!connected && !unavailable) throw new Error("Unexpected health response");
+    const connected =
+      response.status === 200 &&
+      body.status === "ok" &&
+      body.database === "connected";
+    const unavailable =
+      response.status === 503 &&
+      body.status === "degraded" &&
+      body.database === "unavailable";
+    if (!connected && !unavailable)
+      throw new Error("Unexpected health response");
 
     return [
       initialStatuses[0],

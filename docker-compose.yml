@@ -39,7 +39,7 @@ services:
     command:
       - sh
       - -c
-      - alembic upgrade head && exec python -m uvicorn app.main:app --host "$$BACKEND_HOST" --port "$$BACKEND_PORT" --reload
+      - alembic upgrade head && exec python -m uvicorn app.main:app --no-access-log --host "$$BACKEND_HOST" --port "$$BACKEND_PORT" --reload
     depends_on:
       db:
         condition: service_healthy
