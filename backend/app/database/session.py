@@ -37,4 +37,5 @@ def is_database_connected() -> bool:
         )
         return False
 
+    logger.info("Database connection successful")
     return True

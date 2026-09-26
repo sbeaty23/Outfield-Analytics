@@ -26,7 +26,11 @@ body {
   margin: 0;
   color: var(--text);
   background:
-    radial-gradient(circle at 50% 0%, rgba(35, 89, 59, 0.28), transparent 42rem),
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(35, 89, 59, 0.28),
+      transparent 42rem
+    ),
     linear-gradient(180deg, #091710 0%, var(--background) 72%);
   font-family: Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -44,7 +48,11 @@ body {
   padding: clamp(1.5rem, 5vw, 3rem);
   border: 1px solid var(--border);
   border-radius: 1rem;
-  background: linear-gradient(145deg, rgba(17, 38, 27, 0.94), rgba(9, 24, 16, 0.96));
+  background: linear-gradient(
+    145deg,
+    rgba(17, 38, 27, 0.94),
+    rgba(9, 24, 16, 0.96)
+  );
   box-shadow: 0 1.75rem 5rem rgba(0, 0, 0, 0.32);
 }
 

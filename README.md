@@ -14,6 +14,10 @@ The app will do more than display data from another API. It will normalize sourc
 
 ## Data and architecture
 
+See [architecture](docs/architecture.md) for the current components and request
+flow, and [development workflow](docs/development.md) for branches, CI, and the
+Phase 1 milestone checklist.
+
 Current-season rosters, stats, standings, coaching staff, and schedules will come from narrow requests to MLB's public statistics endpoints. The backend will request and cache that data; the browser will not call the provider directly. Historical games and statistics will primarily come from Retrosheet, processed into PostgreSQL for analysis and model training. The deployed app will include Retrosheet attribution.
 
 ```text
@@ -67,10 +71,41 @@ Open `NEXT_PUBLIC_API_URL` plus `/api/health`. A healthy response is `{"status":
 
 Run the code checks from their respective directories:
 
+For backend development, use Python 3.13 or later, create and activate a virtual
+environment, then run `python -m pip install -e ".[test,dev]"` in `backend/`.
+For the frontend, run `npm ci` in `frontend/`.
+
 | Directory | Commands |
 | --- | --- |
-| `backend/` | `python -m pytest --quiet` |
-| `frontend/` | `npm test`, `npm run lint`, `npx tsc --noEmit` |
+| `backend/` | `ruff check .`, `ruff format --check .`, `python -m pytest --quiet` |
+| `frontend/` | `npm run lint`, `npm run format:check`, `npm test`, `npm run build` |
+
+Use `ruff format .` in `backend/` and `npm run format` in `frontend/` to format
+code. Ruff also checks Python imports; `ruff check . --fix` applies supported
+lint fixes. ESLint uses the Next.js defaults and Prettier uses its defaults.
+The [GitHub Actions workflow](.github/workflows/ci.yml) runs these checks on every
+push and pull request, using Node 24 and Python 3.13. The frontend production
+build includes TypeScript checks. There is no automated deployment.
+
+### Errors and logs
+
+Database outages return HTTP 503 with `{"status":"degraded","database":"unavailable"}`.
+Unexpected failures return HTTP 500 with `{"detail":"Internal server error"}`;
+invalid request inputs return HTTP 422 with `{"detail":"Request validation failed"}`.
+Exception details and validation inputs are not returned to the browser.
+
+Backend logs include application startup/shutdown, successful database health
+checks, database failures, request receipt, response status, and elapsed time.
+Request logs use route templates and omit bodies, headers, query strings, and
+path parameter values. The container disables Uvicorn's separate access log;
+when running Uvicorn directly, also pass `--no-access-log`.
+Development exceptions include tracebacks in server logs; other environments
+log only exception types. Keep development logs private.
+
+Real credentials belong in ignored environment files, never in public assets or
+`NEXT_PUBLIC_*` variables (which are exposed to browsers). Environment examples
+contain placeholders only. Environment files, private keys, and logs are ignored
+by Git; backend environment files are also excluded from the Docker build context.
 
 ## Roadmap and current status
 
@@ -85,4 +120,10 @@ Run the code checks from their respective directories:
 9. **Upcoming games:** Combine the historical model with current-season inputs.
 10. **Production polish:** CI/CD, monitoring, logging, documentation, and performance.
 
-Phase 1 is in progress. The app, database, migrations, Compose startup, health query, container networking, CORS, and backend outage/recovery have been checked locally. Backend and frontend tests pass. CI, visual browser confirmation, and database persistence after container recreation are still pending. Features and model choices may change as the project develops.
+Phase 1 foundation code, architecture documentation, and basic CI configuration
+are implemented. The app, database, migrations, Compose startup, health query,
+container networking, CORS, and backend outage/recovery have been checked locally.
+The first GitHub CI run, visual browser confirmation, and database persistence
+after container recreation remain milestone verification steps. Follow the
+[v0.1.0 checklist](docs/development.md#first-milestone-v010) before publishing the
+milestone tag. Features and model choices may change as the project develops.

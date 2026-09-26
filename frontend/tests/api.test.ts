@@ -9,11 +9,13 @@ afterEach(() => {
 
 function mockResponse(status: number, body: unknown) {
   vi.stubEnv("NEXT_PUBLIC_API_URL", "https://api.test/");
-  const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
-    void _input;
-    void _init;
-    return new Response(JSON.stringify(body), { status });
-  });
+  const fetchMock = vi.fn(
+    async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      void _input;
+      void _init;
+      return new Response(JSON.stringify(body), { status });
+    },
+  );
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
@@ -21,17 +23,28 @@ function mockResponse(status: number, body: unknown) {
 test("healthy API uses the browser URL, disables caching, and reports connected services", async () => {
   const fetchMock = mockResponse(200, { status: "ok", database: "connected" });
   const result = await getSystemStatus();
-  expect(result.map(({ label }) => label)).toEqual(["Online", "Connected", "Connected"]);
+  expect(result.map(({ label }) => label)).toEqual([
+    "Online",
+    "Connected",
+    "Connected",
+  ]);
   expect(fetchMock).toHaveBeenCalledWith(
     "https://api.test/api/health",
-    expect.objectContaining({ cache: "no-store", signal: expect.any(AbortSignal) }),
+    expect.objectContaining({
+      cache: "no-store",
+      signal: expect.any(AbortSignal),
+    }),
   );
 });
 
 test("degraded API reports a connected backend and unavailable database", async () => {
   mockResponse(503, { status: "degraded", database: "unavailable" });
   const result = await getSystemStatus();
-  expect(result.map(({ label }) => label)).toEqual(["Online", "Connected", "Unavailable"]);
+  expect(result.map(({ label }) => label)).toEqual([
+    "Online",
+    "Connected",
+    "Unavailable",
+  ]);
   expect(result[2].state).toBe("unhealthy");
 });
 
@@ -43,7 +56,11 @@ test.each([
   [200, {}],
 ])("invalid health response: %s %j", async (status, body) => {
   mockResponse(status, body);
-  expect((await getSystemStatus()).map(({ label }) => label)).toEqual(["Online", "Unavailable", "Unknown"]);
+  expect((await getSystemStatus()).map(({ label }) => label)).toEqual([
+    "Online",
+    "Unavailable",
+    "Unknown",
+  ]);
 });
 
 test("missing configuration never issues a request", async () => {
@@ -55,22 +72,36 @@ test("missing configuration never issues a request", async () => {
 
 test("malformed JSON is handled", async () => {
   vi.stubEnv("NEXT_PUBLIC_API_URL", "https://api.test");
-  vi.stubGlobal("fetch", vi.fn(async () => new Response("not JSON")));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("not JSON")),
+  );
   expect((await getSystemStatus())[1].label).toBe("Unavailable");
 });
 
-test.each([new TypeError("Network failure"), new DOMException("Timed out", "TimeoutError")])(
-  "request failure is handled: %s",
-  async (error) => {
-    vi.stubEnv("NEXT_PUBLIC_API_URL", "https://api.test");
-    vi.stubGlobal("fetch", vi.fn(async () => { throw error; }));
-    expect((await getSystemStatus()).map(({ label }) => label)).toEqual(["Online", "Unavailable", "Unknown"]);
-  },
-);
+test.each([
+  new TypeError("Network failure"),
+  new DOMException("Timed out", "TimeoutError"),
+])("request failure is handled: %s", async (error) => {
+  vi.stubEnv("NEXT_PUBLIC_API_URL", "https://api.test");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => {
+      throw error;
+    }),
+  );
+  expect((await getSystemStatus()).map(({ label }) => label)).toEqual([
+    "Online",
+    "Unavailable",
+    "Unknown",
+  ]);
+});
 
 test("request combines caller cancellation with a five-second timeout", async () => {
   const fetchMock = mockResponse(200, { status: "ok", database: "connected" });
-  const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(new AbortController().signal);
+  const timeout = vi
+    .spyOn(AbortSignal, "timeout")
+    .mockReturnValue(new AbortController().signal);
   const controller = new AbortController();
   await getSystemStatus(controller.signal);
   expect(timeout).toHaveBeenCalledWith(5000);

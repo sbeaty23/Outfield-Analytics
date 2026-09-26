@@ -7,7 +7,8 @@ import type { SystemStatus } from "@/types/system-status";
 const icons = { healthy: "✓", loading: "…", unhealthy: "!", unknown: "?" };
 
 export function SystemStatusPanel() {
-  const [statuses, setStatuses] = useState<readonly SystemStatus[]>(initialStatuses);
+  const [statuses, setStatuses] =
+    useState<readonly SystemStatus[]>(initialStatuses);
   const request = useRef<AbortController | null>(null);
   const checking = statuses.some((status) => status.state === "loading");
 
@@ -17,7 +18,9 @@ export function SystemStatusPanel() {
     void getSystemStatus(controller.signal).then((result) => {
       if (!controller.signal.aborted) setStatuses(result);
     });
-    return () => { request.current?.abort(); };
+    return () => {
+      request.current?.abort();
+    };
   }, []);
 
   async function refresh() {
@@ -33,7 +36,12 @@ export function SystemStatusPanel() {
     <section className="status-panel" aria-labelledby="system-status-title">
       <div className="status-heading">
         <h2 id="system-status-title">System Status</h2>
-        <button className="status-refresh" type="button" disabled={checking} onClick={refresh}>
+        <button
+          className="status-refresh"
+          type="button"
+          disabled={checking}
+          onClick={refresh}
+        >
           Refresh status
         </button>
       </div>
@@ -42,7 +50,9 @@ export function SystemStatusPanel() {
           <li className="status-row" key={status.service}>
             <span className="service-name">{status.service}</span>
             <span className="service-state" data-state={status.state}>
-              <span className="status-check" aria-hidden="true">{icons[status.state]}</span>
+              <span className="status-check" aria-hidden="true">
+                {icons[status.state]}
+              </span>
               {status.label}
             </span>
           </li>
