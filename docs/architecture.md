@@ -34,13 +34,27 @@ PostgreSQL protocol rather than REST.
 2. React requests `GET /api/health` at `NEXT_PUBLIC_API_URL`.
 3. FastAPI executes `SELECT 1` against PostgreSQL.
 4. The API returns HTTP 200 with `{"status":"ok","database":"connected"}`,
-   or HTTP 503 with `{"status":"degraded","database":"unavailable"}`.
+   or HTTP 503 with `{"detail":"Database unavailable"}`.
 5. React displays the result and provides a refresh button. If the API cannot be
    reached, it displays Backend **Unavailable** and Database **Unknown**.
 
 Unexpected errors return a generic JSON response. Backend logs record lifecycle
 events, database health, request methods, route templates, status, and duration.
 Development tracebacks stay in private server logs.
+
+## API response conventions
+
+Return success payloads directly as JSON with a documented Pydantic response
+model; a universal result wrapper is unnecessary. Use HTTP status codes to
+indicate success or failure. Health success is HTTP 200 with
+`{"status":"ok","database":"connected"}`.
+
+API errors use `{"detail":"Human-readable message"}` with a string `detail`.
+Raise FastAPI `HTTPException` for expected failures and document their
+`ErrorResponse` schema on the route. Missing routes return 404, unsupported
+methods return 405, validation failures return 422, and unexpected failures
+return a sanitized 500. Never include credentials or raw exception details in
+responses. CORS preflight responses are handled separately by middleware.
 
 ## Local runtime and configuration
 

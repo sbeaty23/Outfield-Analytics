@@ -11,10 +11,7 @@ def test_health_reports_unavailable_database(monkeypatch) -> None:
         response = client.get("/api/health")
 
     assert response.status_code == 503
-    assert response.json() == {
-        "status": "degraded",
-        "database": "unavailable",
-    }
+    assert response.json() == {"detail": "Database unavailable"}
 
 
 def test_health_reports_connected_database(monkeypatch) -> None:
@@ -28,6 +25,15 @@ def test_health_reports_connected_database(monkeypatch) -> None:
         "status": "ok",
         "database": "connected",
     }
+
+
+def test_openapi_documents_health_success_and_error_contracts() -> None:
+    schema = create_app().openapi()
+    responses = schema["paths"]["/api/health"]["get"]["responses"]
+    for code, model in [("200", "HealthResponse"), ("503", "ErrorResponse")]:
+        assert responses[code]["content"]["application/json"]["schema"] == {
+            "$ref": f"#/components/schemas/{model}"
+        }
 
 
 def test_health_allows_development_frontend_origin() -> None:

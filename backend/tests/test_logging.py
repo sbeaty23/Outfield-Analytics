@@ -19,7 +19,7 @@ def test_database_outage_is_sanitized_and_logged(monkeypatch, caplog) -> None:
         response = client.get("/api/health?token=private-query-secret")
 
     assert response.status_code == 503
-    assert response.json() == {"status": "degraded", "database": "unavailable"}
+    assert response.json() == {"detail": "Database unavailable"}
     assert "application started" in caplog.text
     assert "Request received method=GET" in caplog.text
     assert "Database health check failed: OperationalError" in caplog.text

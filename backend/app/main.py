@@ -45,6 +45,10 @@ def create_app() -> FastAPI:
         title=APP_TITLE,
         version=APP_VERSION,
         lifespan=lifespan,
+        responses={
+            422: {"model": ErrorResponse, "description": "Request validation failed."},
+            500: {"model": ErrorResponse, "description": "Internal server error."},
+        },
     )
 
     application.add_middleware(RequestLoggingMiddleware)

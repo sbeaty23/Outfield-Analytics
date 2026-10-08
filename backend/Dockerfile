@@ -38,6 +38,6 @@ RUN python -m pip uninstall --yes pip
 USER app
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD ["python", "-c", "import os, urllib.request; urllib.request.urlopen(f\"http://localhost:{os.environ['BACKEND_PORT']}/api/health\", timeout=2)"]
+    CMD ["python", "-c", "import os, socket, urllib.request; urllib.request.urlopen(f\"http://{socket.gethostname()}:{os.environ['BACKEND_PORT']}/api/health\", timeout=2)"]
 
 CMD ["sh", "-c", "exec python -m uvicorn app.main:app --no-access-log --host \"$BACKEND_HOST\" --port \"$BACKEND_PORT\""]

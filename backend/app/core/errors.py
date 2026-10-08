@@ -48,5 +48,6 @@ async def handle_validation_error(
 ) -> JSONResponse:
     # FastAPI's default validation details can echo sensitive input values.
     return JSONResponse(
-        status_code=422, content={"detail": "Request validation failed"}
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        content=ErrorResponse(detail="Request validation failed").model_dump(),
     )

@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, HTTPException, status
 
 from app.database.session import is_database_connected
+from app.schemas.error import ErrorResponse
 from app.schemas.health import HealthResponse
 
 router = APIRouter(tags=["health"])
@@ -13,13 +14,15 @@ router = APIRouter(tags=["health"])
     responses={
         status.HTTP_503_SERVICE_UNAVAILABLE: {
             "description": "The API is running but PostgreSQL is unavailable.",
-            "model": HealthResponse,
+            "model": ErrorResponse,
         },
     },
 )
-def get_health(response: Response) -> HealthResponse:
+def get_health() -> HealthResponse:
     if is_database_connected():
         return HealthResponse(status="ok", database="connected")
 
-    response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    return HealthResponse(status="degraded", database="unavailable")
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Database unavailable",
+    )

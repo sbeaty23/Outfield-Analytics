@@ -41,7 +41,34 @@ and merge. Keep credentials and local environment files out of commits. Commit
 each working increment; do not recreate completed stages just to manufacture
 their suggested commit sequence.
 
-## CI
+## Private configuration
+
+Keep IP addresses, numeric ports, database names, usernames, passwords, and API
+secrets in ignored `.env` files or deployment environment/secret settings.
+Public templates leave connection fields blank. Fill them locally after copying
+the template; do not paste private values into source, documentation, or commits.
+
+Compose resolves `${VARIABLE}` references and requires nonempty values. Backend
+Pydantic settings and Alembic load `DATABASE_URL` from the environment. Use `db`
+as the database host inside Compose and keep its URL credentials and port in sync
+with `POSTGRES_*`. Health checks read runtime settings; the backend check resolves
+its container hostname. Bind the backend to an interface reachable by containers.
+No source file needs credentials embedded in it.
+
+`NEXT_PUBLIC_API_URL` is a public browser origin, never a credential store.
+Values prefixed `NEXT_PUBLIC_` are visible to visitors even when sourced from an
+ignored file. Supply all secrets only to the backend. An API address used by a
+browser cannot be kept secret from that browser.
+
+Run `python scripts/check_public_config.py` from the repository root before
+committing. It checks tracked and new nonignored files for real environment files, nonblank
+connection templates, literal IP addresses/ports, and common credential
+assignments, and CI runs the same check. It reports locations without matched values. This
+check complements review; it cannot identify every possible secret format.
+If a real credential was previously published, rotate it; removing it from the
+current files does not remove it from Git history.
+
+## CI checks
 
 The [CI workflow](../.github/workflows/ci.yml) runs on every push and pull request.
 It uses Node 24 and Python 3.13 to match the Docker runtimes. It has read-only
