@@ -1,4 +1,4 @@
-FROM python:3.13-slim AS builder
+FROM python:3.13-slim@sha256:bf44cdfcb76cd3b41e879bc058fc37ec5872002ccfde7fcb765e218cde0cd79c AS builder
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
@@ -16,19 +16,24 @@ COPY alembic ./alembic
 COPY tests ./tests
 RUN pytest --quiet
 
-FROM python:3.13-slim AS runtime
+FROM python:3.13-slim@sha256:bf44cdfcb76cd3b41e879bc058fc37ec5872002ccfde7fcb765e218cde0cd79c AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN groupadd --system --gid 1001 app \
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 1001 app \
     && useradd --system --uid 1001 --gid app --no-create-home app
 
 COPY --from=builder /install /usr/local
 COPY alembic.ini ./alembic.ini
 COPY alembic ./alembic
+
+RUN python -m pip uninstall --yes pip
 
 USER app
 

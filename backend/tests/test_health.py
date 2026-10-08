@@ -64,6 +64,21 @@ def test_unknown_route_returns_not_found() -> None:
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Not Found"}
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["strict-transport-security"] == (
+        "max-age=31536000; includeSubDomains"
+    )
+
+
+def test_unconfigured_host_is_rejected() -> None:
+    with TestClient(create_app()) as client:
+        response = client.get("/api/health", headers={"Host": "unconfigured.example"})
+
+    assert response.status_code == 400
+    assert response.headers["x-content-type-options"] == "nosniff"
 
 
 def test_health_rejects_unsupported_methods() -> None:

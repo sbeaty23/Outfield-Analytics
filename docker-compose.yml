@@ -1,10 +1,32 @@
 name: outfield-analytics
 
+x-runtime-security: &runtime-security
+  init: true
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  pids_limit: 200
+
+x-backend-environment: &backend-environment
+  ENVIRONMENT: ${ENVIRONMENT}
+  FRONTEND_URL: ${FRONTEND_URL}
+  BACKEND_ALLOWED_HOSTS: ${BACKEND_ALLOWED_HOSTS}
+  MLB_API_BASE_URL: ${MLB_API_BASE_URL}
+  MLB_SPORT_ID: ${MLB_SPORT_ID}
+  MLB_CURRENT_SEASON: ${MLB_CURRENT_SEASON}
+  MLB_REQUEST_TIMEOUT_SECONDS: ${MLB_REQUEST_TIMEOUT_SECONDS}
+  MLB_MAX_CONCURRENT_REQUESTS: ${MLB_MAX_CONCURRENT_REQUESTS}
+  MLB_MAX_RESPONSE_BYTES: ${MLB_MAX_RESPONSE_BYTES}
+  REQUEST_TIMEOUT_SECONDS: ${REQUEST_TIMEOUT_SECONDS}
+  REQUEST_RATE_LIMIT_PER_MINUTE: ${REQUEST_RATE_LIMIT_PER_MINUTE}
+
 services:
   db:
-    image: postgres:17-alpine
-    ports:
-      - "${POSTGRES_BIND_HOST}:${POSTGRES_PORT}:${POSTGRES_PORT}"
+    image: outfield-analytics-postgres:local
+    build:
+      context: ./docker/postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -13,6 +35,14 @@ services:
     command: ["postgres", "-c", "port=${POSTGRES_PORT}"]
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - data
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 200
+    mem_limit: 768m
+    cpus: 1.0
     healthcheck:
       test:
         - CMD-SHELL
@@ -22,48 +52,123 @@ services:
       start_period: 10s
       retries: 10
 
-  backend:
+  db-provision:
+    image: outfield-analytics-postgres:local
     build:
-      context: ./backend
-    env_file:
-      - .env
-    ports:
-      - "${BACKEND_PORT}:${BACKEND_PORT}"
+      context: ./docker/postgres
     environment:
-      BACKEND_HOST: ${BACKEND_HOST}
-      BACKEND_PORT: ${BACKEND_PORT}
-      WATCHFILES_FORCE_POLLING: "true"
+      PGHOST: db
+      PGPORT: ${POSTGRES_PORT}
+      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}
+      POSTGRES_SYNC_USER: ${POSTGRES_SYNC_USER}
+      POSTGRES_SYNC_PASSWORD: ${POSTGRES_SYNC_PASSWORD}
     volumes:
-      - ./backend/app:/app/app:ro
-      - ./backend/alembic:/app/alembic:ro
-    command:
-      - sh
-      - -c
-      - alembic upgrade head && exec python -m uvicorn app.main:app --no-access-log --host "$$BACKEND_HOST" --port "$$BACKEND_PORT" --reload
+      - ./docker/postgres/provision-roles.sql:/provision-roles.sql:ro
+    command: ["psql", "--no-psqlrc", "--set", "ON_ERROR_STOP=1", "--file", "/provision-roles.sql"]
+    networks:
+      - data
+    <<: *runtime-security
+    tmpfs:
+      - /tmp
     depends_on:
       db:
         condition: service_healthy
 
+  migrate:
+    build:
+      context: ./backend
+    environment:
+      <<: *backend-environment
+      DATABASE_URL: ${MIGRATION_DATABASE_URL}
+      DATABASE_READ_ONLY: "false"
+    command: ["alembic", "upgrade", "head"]
+    networks:
+      - data
+    <<: *runtime-security
+    tmpfs:
+      - /tmp
+    depends_on:
+      db-provision:
+        condition: service_completed_successfully
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      <<: *backend-environment
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_READ_ONLY: "true"
+      BACKEND_HOST: ${BACKEND_HOST}
+      BACKEND_PORT: ${BACKEND_PORT}
+    command:
+      - sh
+      - -c
+      - exec python -m uvicorn app.main:app --no-access-log --no-server-header --host "$$BACKEND_HOST" --port "$$BACKEND_PORT"
+    ports:
+      - "${BACKEND_BIND_HOST}:${BACKEND_PORT}:${BACKEND_PORT}"
+    networks:
+      - edge
+      - data
+    <<: *runtime-security
+    tmpfs:
+      - /tmp
+    mem_limit: 512m
+    cpus: 1.0
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   frontend:
     build:
       context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     environment:
-      FRONTEND_HOST: ${FRONTEND_HOST}
-      FRONTEND_PORT: ${FRONTEND_PORT}
-      BACKEND_PORT: ${BACKEND_PORT}
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-      WATCHPACK_POLLING: "true"
+      HOSTNAME: ${FRONTEND_HOST}
+      PORT: ${FRONTEND_PORT}
+      API_INTERNAL_URL: ${API_INTERNAL_URL}
+      FRONTEND_ALLOWED_HOSTS: ${FRONTEND_ALLOWED_HOSTS}
     ports:
-      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
-    volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
-      - frontend_next:/app/.next
+      - "${FRONTEND_BIND_HOST}:${FRONTEND_PORT}:${FRONTEND_PORT}"
+    networks:
+      - edge
+    <<: *runtime-security
+    tmpfs:
+      - /tmp
+    mem_limit: 512m
+    cpus: 1.0
     depends_on:
       backend:
         condition: service_healthy
 
+  team-sync:
+    profiles:
+      - tools
+    build:
+      context: ./backend
+    environment:
+      <<: *backend-environment
+      DATABASE_URL: ${SYNC_DATABASE_URL}
+      DATABASE_READ_ONLY: "false"
+    command: ["python", "-m", "app.scripts.sync_teams"]
+    networks:
+      - edge
+      - data
+    <<: *runtime-security
+    tmpfs:
+      - /tmp
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+networks:
+  edge:
+  data:
+    internal: true
+
 volumes:
   postgres_data:
-  frontend_node_modules:
-  frontend_next:

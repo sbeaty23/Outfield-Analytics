@@ -43,6 +43,61 @@ body {
   padding: 2rem 1rem;
 }
 
+.content-shell {
+  width: min(100% - 2rem, 64rem);
+  margin: 0 auto;
+  padding: 4rem 0;
+}
+.team-group {
+  margin-top: 2.5rem;
+}
+.team-group h2 {
+  color: var(--muted);
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+.team-grid li {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  background: var(--surface);
+}
+.team-grid a,
+.back-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+.team-grid a:hover {
+  text-decoration: underline;
+}
+.team-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 1rem;
+  margin: 2rem 0;
+}
+.team-facts div {
+  padding: 1rem;
+  border-left: 2px solid var(--accent);
+}
+.team-facts dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+.team-facts dd {
+  margin: 0.35rem 0 0;
+  font-weight: 700;
+}
+
 .diagnostic-card {
   width: min(100%, 42rem);
   padding: clamp(1.5rem, 5vw, 3rem);

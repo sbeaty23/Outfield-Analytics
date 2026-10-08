@@ -1,5 +1,23 @@
 # Outfield Analytics development workflow
 
+## Phase 2 backend foundation
+
+Configure the four `MLB_*` settings in your ignored `.env`. The MLB base URL
+is required; connection values in the examples are intentionally blank. `MLB_CURRENT_SEASON` is the season used for every
+MLB request; update it at rollover. The sport is restricted to MLB (`1`).
+The async HTTP package is now a runtime dependency; rebuild the backend image or
+reinstall the backend package when updating an existing environment.
+
+After starting the backend, use `/docs` to try `GET /api/teams`,
+`GET /api/teams/110`, and `GET /api/teams/110/roster`. Appending `?season=2011`
+must return 422 without contacting MLB. These reads do not write to PostgreSQL.
+
+Run `python -m pytest --quiet`, `ruff check .`, and `ruff format --check .` from
+`backend/`. Provider tests use mock HTTP transports; service and API tests verify
+the replaceable dependency, current-season policy, and sanitized failures
+without requiring MLB or PostgreSQL. A live MLB smoke test is separate from
+deterministic checks.
+
 ## Branches and commits
 
 Keep `main` working and use short-lived feature branches, for example
@@ -31,8 +49,8 @@ repository permissions and performs no deployment.
 
 | Job | Checks in order |
 | --- | --- |
-| Frontend | `npm ci`, `npm run lint`, `npm run format:check`, `npm test`, `npm run build` |
-| Backend | `python -m pip install -e ".[test,dev]"`, `ruff check .`, `ruff format --check .`, `python -m pytest --quiet` |
+| Frontend | `npm ci`, `npm audit --omit=dev --audit-level=high`, `npm run lint`, `npm run format:check`, `npm test`, `npm run build` |
+| Backend | `python -m pip install -e ".[test,dev,security]"`, `pip-audit .`, `ruff check .`, `ruff format --check .`, `python -m pytest --quiet` |
 
 Run these commands from `frontend/` or `backend/` respectively. Next.js builds
 also check TypeScript. CI uses a public test API origin and backend test fixtures;

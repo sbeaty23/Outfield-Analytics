@@ -3,7 +3,7 @@ from fastapi import APIRouter, Response, status
 from app.database.session import is_database_connected
 from app.schemas.health import HealthResponse
 
-router = APIRouter()
+router = APIRouter(tags=["health"])
 
 
 @router.get(

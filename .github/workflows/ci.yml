@@ -19,6 +19,7 @@ jobs:
       NEXT_TELEMETRY_DISABLED: "1"
       # Public, non-routable test origin; builds do not need a running API.
       NEXT_PUBLIC_API_URL: http://api.example.test
+      API_INTERNAL_URL: http://internal-api.example.test
     steps:
       - uses: actions/checkout@v7
         with:
@@ -30,6 +31,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install
         run: npm ci
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
       - name: Lint
         run: npm run lint
       - name: Check formatting
@@ -58,10 +61,17 @@ jobs:
           cache: pip
           cache-dependency-path: backend/pyproject.toml
       - name: Install
-        run: python -m pip install -e ".[test,dev]"
+        run: python -m pip install -e ".[test,dev,security]"
+      - name: Audit runtime dependencies
+        run: pip-audit .
       - name: Lint
         run: ruff check .
       - name: Check formatting
         run: ruff format --check .
       - name: Test
         run: python -m pytest --quiet
+      - name: Check public configuration
+        working-directory: .
+        run: |
+          python scripts/check_public_config.py
+          python -m unittest discover -s scripts -p "test_*.py"

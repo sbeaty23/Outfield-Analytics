@@ -1,4 +1,9 @@
 import type { SystemStatus } from "@/types/system-status";
+function apiBase(): string {
+  const value = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!value) throw new Error("API URL is missing");
+  return value.replace(/\/$/, "");
+}
 
 export const initialStatuses = [
   { service: "Frontend", label: "Online", state: "healthy" },
@@ -10,11 +15,10 @@ export async function getSystemStatus(
   signal?: AbortSignal,
 ): Promise<readonly SystemStatus[]> {
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-    if (!apiUrl) throw new Error("API URL is missing");
+    const apiUrl = apiBase();
 
     const timeout = AbortSignal.timeout(5000);
-    const response = await fetch(`${apiUrl.replace(/\/$/, "")}/api/health`, {
+    const response = await fetch(`${apiUrl}/api/health`, {
       cache: "no-store",
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });

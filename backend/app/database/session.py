@@ -11,10 +11,20 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+connection_options = "-c statement_timeout=3000"
+if settings.database_read_only:
+    connection_options += " -c default_transaction_read_only=on"
+
 engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,
-    connect_args={"connect_timeout": 2},
+    pool_size=5,
+    max_overflow=5,
+    pool_timeout=5,
+    connect_args={
+        "connect_timeout": 2,
+        "options": connection_options,
+    },
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
