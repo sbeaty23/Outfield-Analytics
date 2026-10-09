@@ -1,6 +1,5 @@
 import logging
 from contextlib import asynccontextmanager
-from app.schemas.error import ErrorResponse
 
 import httpx2 as httpx
 from fastapi import FastAPI
@@ -20,6 +19,7 @@ from app.core.security import RequestSecurityMiddleware, SecurityHeadersMiddlewa
 from app.database.session import engine
 from app.providers.exceptions import ProviderError
 from app.providers.mlb import MLBProvider
+from app.schemas.error import ErrorResponse
 
 logger = logging.getLogger(__name__)
 
