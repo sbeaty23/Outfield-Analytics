@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from app.schemas.error import ErrorResponse
 
 import httpx2 as httpx
 from fastapi import FastAPI
