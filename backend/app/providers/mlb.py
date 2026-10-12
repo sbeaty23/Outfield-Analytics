@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import math
+from collections.abc import Awaitable, Callable
 from datetime import date
 from functools import wraps
 from time import perf_counter
@@ -18,6 +19,7 @@ from app.providers.exceptions import (
     ProviderError,
     ProviderNotFoundError,
     ProviderTimeoutError,
+    ProviderUnavailableError,
 )
 from app.schemas.player import Player
 from app.schemas.roster import Roster, RosterPlayer
@@ -34,6 +36,12 @@ from app.schemas.team import Team, TeamList
 from app.services.schedule_policy import schedule_range
 
 logger = logging.getLogger(__name__)
+_RETRYABLE_STATUS_CODES = {429, 502, 503, 504}
+
+
+class _RetryableStatus(Exception):
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
 
 
 def normalized_resource(method):
@@ -141,53 +149,126 @@ def _integer(stat: dict[str, Any], key: str) -> int | None:
 
 
 class MLBProvider(BaseballDataProvider):
-    def __init__(self, client: httpx.AsyncClient, settings: Settings):
+    def __init__(
+        self,
+        client: httpx.AsyncClient,
+        settings: Settings,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+    ):
         self._client = client
         self._base_url = str(settings.mlb_api_base_url).rstrip("/")
         self._sport_id = settings.mlb_sport_id
         self._season = settings.mlb_current_season
         self._timeout = settings.mlb_request_timeout_seconds
+        self._max_attempts = settings.mlb_max_attempts
+        self._retry_backoff = settings.mlb_retry_backoff_seconds
         self._request_slots = asyncio.Semaphore(settings.mlb_max_concurrent_requests)
         self._max_response_bytes = settings.mlb_max_response_bytes
+        self._sleep = sleep
+
+    async def _get_once(self, path: str, params: dict[str, str | int]) -> Any:
+        async with self._request_slots:
+            async with self._client.stream(
+                "GET",
+                f"{self._base_url}/{path}",
+                params=params,
+                timeout=self._timeout,
+            ) as response:
+                if response.status_code == 404:
+                    raise ProviderNotFoundError()
+                if response.status_code in _RETRYABLE_STATUS_CODES:
+                    raise _RetryableStatus(response.status_code)
+                response.raise_for_status()
+                declared_size = response.headers.get("content-length")
+                if declared_size and int(declared_size) > self._max_response_bytes:
+                    raise ProviderError()
+                body = bytearray()
+                async for chunk in response.aiter_bytes():
+                    body.extend(chunk)
+                    if len(body) > self._max_response_bytes:
+                        raise ProviderError()
+        return json.loads(body)
 
     async def _get(self, path: str, **params: str | int) -> Any:
         started = perf_counter()
         resource = path.split("/")[0]
         params["season"] = self._season
-        try:
-            async with self._request_slots:
-                async with self._client.stream(
-                    "GET",
-                    f"{self._base_url}/{path}",
-                    params=params,
-                    timeout=self._timeout,
-                ) as response:
-                    if response.status_code == 404:
-                        raise ProviderNotFoundError()
-                    response.raise_for_status()
-                    declared_size = response.headers.get("content-length")
-                    if declared_size and int(declared_size) > self._max_response_bytes:
-                        raise ProviderError()
-                    body = bytearray()
-                    async for chunk in response.aiter_bytes():
-                        body.extend(chunk)
-                        if len(body) > self._max_response_bytes:
-                            raise ProviderError()
-            result = json.loads(body)
-            logger.info(
-                "provider=mlb resource=%s status=success duration_ms=%d",
-                resource,
-                int((perf_counter() - started) * 1000),
-            )
-            return result
-        except httpx.TimeoutException as error:
-            logger.warning("provider=mlb resource=%s status=timeout", resource)
-            raise ProviderTimeoutError() from error
-        except ProviderNotFoundError:
-            raise
-        except (httpx.HTTPError, ValueError) as error:
-            logger.warning("provider=mlb resource=%s status=error", resource)
-            raise ProviderError() from error
+        for attempt in range(1, self._max_attempts + 1):
+            attempt_started = perf_counter()
+            try:
+                result = await self._get_once(path, params)
+                logger.info(
+                    "event=provider_attempt provider=mlb resource=%s attempt=%d "
+                    "upstream_status=success duration_ms=%d",
+                    resource,
+                    attempt,
+                    int((perf_counter() - attempt_started) * 1000),
+                )
+                return result
+            except ProviderNotFoundError:
+                raise
+            except ProviderError:
+                raise
+            except httpx.TimeoutException as error:
+                retry = attempt < self._max_attempts
+                self._log_attempt(resource, attempt, "timeout", attempt_started, retry)
+                if not retry:
+                    raise ProviderTimeoutError() from error
+            except _RetryableStatus as error:
+                retry = attempt < self._max_attempts
+                self._log_attempt(
+                    resource,
+                    attempt,
+                    str(error.status_code),
+                    attempt_started,
+                    retry,
+                )
+                if not retry:
+                    raise ProviderUnavailableError() from error
+            except httpx.TransportError as error:
+                retry = attempt < self._max_attempts
+                self._log_attempt(
+                    resource, attempt, "transport_error", attempt_started, retry
+                )
+                if not retry:
+                    raise ProviderUnavailableError() from error
+            except (httpx.HTTPError, ValueError) as error:
+                logger.warning(
+                    "event=provider_attempt provider=mlb resource=%s attempt=%d "
+                    "upstream_status=error retry=false duration_ms=%d",
+                    resource,
+                    attempt,
+                    int((perf_counter() - attempt_started) * 1000),
+                )
+                raise ProviderError() from error
+
+            await self._sleep(self._retry_backoff * (2 ** (attempt - 1)))
+
+        logger.warning(
+            "event=provider_request provider=mlb resource=%s status=unavailable "
+            "duration_ms=%d",
+            resource,
+            int((perf_counter() - started) * 1000),
+        )
+        raise ProviderUnavailableError()
+
+    @staticmethod
+    def _log_attempt(
+        resource: str,
+        attempt: int,
+        upstream_status: str,
+        started: float,
+        retry: bool,
+    ) -> None:
+        logger.warning(
+            "event=provider_attempt provider=mlb resource=%s attempt=%d "
+            "upstream_status=%s retry=%s duration_ms=%d",
+            resource,
+            attempt,
+            upstream_status,
+            str(retry).lower(),
+            int((perf_counter() - started) * 1000),
+        )
 
     async def _teams(self, path: str, **params: str | int) -> list[Team]:
         try:

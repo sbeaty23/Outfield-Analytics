@@ -52,6 +52,35 @@ def test_allowed_hosts_must_not_be_empty(monkeypatch) -> None:
         Settings(_env_file=None).allowed_hosts
 
 
+def test_cache_can_be_disabled_without_a_redis_url(monkeypatch) -> None:
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    settings = Settings(_env_file=None, cache_enabled=False)
+    assert settings.redis_url is None
+
+
+def test_enabled_cache_requires_a_redis_url(monkeypatch) -> None:
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    with pytest.raises(ValidationError, match="REDIS_URL"):
+        Settings(_env_file=None, cache_enabled=True)
+
+
+def test_redis_and_retry_configuration(monkeypatch) -> None:
+    settings = Settings(
+        _env_file=None,
+        cache_enabled=True,
+        redis_url="redis://cache.example.test",
+        redis_connect_timeout_seconds=2,
+        redis_operation_timeout_seconds=3,
+        redis_max_connections=12,
+        mlb_max_attempts=3,
+        mlb_retry_backoff_seconds=0.5,
+        expensive_request_rate_limit_per_minute=30,
+    )
+    assert settings.cache_enabled is True
+    assert settings.redis_max_connections == 12
+    assert settings.mlb_max_attempts == 3
+
+
 @pytest.mark.parametrize(
     "field, value",
     [

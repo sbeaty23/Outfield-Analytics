@@ -8,6 +8,7 @@ from app.providers.exceptions import (
     ProviderError,
     ProviderNotFoundError,
     ProviderTimeoutError,
+    ProviderUnavailableError,
 )
 from app.schemas.error import ErrorResponse
 
@@ -19,6 +20,8 @@ async def handle_provider_error(request: Request, error: ProviderError) -> JSONR
         code, detail = 404, "Baseball resource not found"
     elif isinstance(error, ProviderTimeoutError):
         code, detail = 504, "Baseball data provider timed out"
+    elif isinstance(error, ProviderUnavailableError):
+        code, detail = 502, "Baseball data provider unavailable"
     else:
         code, detail = 502, "Baseball data provider unavailable"
     logger.warning("Baseball provider failure type=%s", type(error).__name__)

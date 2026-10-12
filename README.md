@@ -5,20 +5,21 @@ and historical data, calculated statistics, and future game predictions.
 
 ## Current status
 
-**Current phase: Phase 2 — Current Baseball Data Integration.**
+**Current phase: Phase 3 — Caching, Reliability, and Request Control.**
 
-The application has a replaceable provider boundary, normalized current team,
-roster, statistics, standings, schedule, and player contracts, a manual team
-reference synchronization command, and simple server-rendered team pages. MLB
-responses are translated inside the backend and never exposed directly to
-React. See [data sources](docs/data-sources.md) for the current-season policy.
+The application has a replaceable provider boundary, normalized current-season
+baseball contracts, Redis caching with stale fallback and request coalescing,
+bounded MLB retries, tiered API rate limits, and structured request logging.
+MLB responses are translated inside the backend and never exposed directly to
+React. See [data sources](docs/data-sources.md) for the current-season policy and
+[caching](docs/caching.md) for refresh behavior.
 
-**Stack:** Next.js / React, TypeScript, Tailwind CSS, FastAPI, SQLAlchemy, and
-PostgreSQL. Next.js performs server-side requests to FastAPI; FastAPI reaches MLB
-only through the provider layer.
+**Stack:** Next.js / React, TypeScript, Tailwind CSS, FastAPI, SQLAlchemy,
+PostgreSQL, and Redis. Next.js performs server-side requests to FastAPI; FastAPI
+reaches MLB only through the provider layer and caches normalized results.
 
-Planned later features include projected depth charts, Redis caching, historical
-Retrosheet ingestion, and evaluated prediction models.
+Planned later features include projected depth charts, historical Retrosheet
+ingestion, and evaluated prediction models.
 See [architecture](docs/architecture.md) and [development workflow](docs/development.md).
 
 ## Run locally
@@ -28,7 +29,7 @@ root in PowerShell:
 
 ```powershell
 if (!(Test-Path .env)) { Copy-Item .env.example .env }
-# Fill the blank settings in .env with your local configuration.
+# Fill every blank connection setting in .env with private local configuration.
 docker compose config --quiet
 docker compose up --build
 ```
@@ -52,8 +53,9 @@ or `NEXT_PUBLIC_*` variables. For frontend work outside Docker, copy
 
 ```powershell
 docker compose ps
-docker compose logs db backend frontend
+docker compose logs db redis backend frontend
 docker compose --profile tools run --rm team-sync
+docker compose exec backend python -m app.scripts.clear_cache
 ```
 
 `GET /api/health` returns HTTP 200 when PostgreSQL is connected and HTTP 503 when
@@ -77,7 +79,7 @@ This is a non-commercial project, unaffiliated with MLB or its clubs. Planned
 Retrosheet usage will include attribution. No official logos, player photos,
 broadcast media, or live game feed are included.
 
-## Phase 2 acceptance
+## Phase 3 acceptance
 
-See [Phase 2 verification](docs/phase2-verification.md) for configuration,
-team synchronization, API contracts, and offline/live acceptance commands.
+See [Phase 3 verification](docs/phase3-verification.md) for cache, failure,
+request-control, configuration, and offline/live acceptance checks.

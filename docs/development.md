@@ -1,5 +1,24 @@
 # Outfield Analytics development workflow
 
+## Phase 3 reliability foundation
+
+Configure `CACHE_ENABLED`, `REDIS_URL`, and `REDIS_PORT` in the ignored `.env`.
+The public template intentionally leaves all connection, binding, database, and
+credential values blank. Compose keeps Redis on the private data network and
+does not publish it to the host.
+
+Redis is optional at application startup. With caching disabled or temporarily
+unavailable, requests continue to the MLB provider and cache operations are
+logged as bypasses. Run the namespace-safe development clear command with:
+
+```powershell
+docker compose exec backend python -m app.scripts.clear_cache
+```
+
+Use `GET /api/diagnostics` only in development or test to inspect database and
+Redis connectivity. It never calls MLB and is not registered in production.
+See [caching](caching.md) and [reliability](reliability.md) for policy details.
+
 ## Phase 2 backend foundation
 
 Configure the four `MLB_*` settings in your ignored `.env`. The MLB base URL

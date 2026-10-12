@@ -7,14 +7,20 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from app.api import health, players, standings, teams
+from app.api import diagnostics, health, players, standings, teams
+from app.cache.loader import CachedResourceLoader
+from app.cache.service import CacheService
 from app.core.config import APP_TITLE, APP_VERSION, settings
 from app.core.errors import (
     handle_provider_error,
     handle_unexpected_error,
     handle_validation_error,
 )
-from app.core.logging import RequestLoggingMiddleware, configure_logging
+from app.core.logging import (
+    RequestErrorMiddleware,
+    RequestLoggingMiddleware,
+    configure_logging,
+)
 from app.core.security import RequestSecurityMiddleware, SecurityHeadersMiddleware
 from app.database.session import engine
 from app.providers.exceptions import ProviderError
@@ -28,6 +34,14 @@ logger = logging.getLogger(__name__)
 async def lifespan(application: FastAPI):
     configure_logging()
     logger.info("Outfield Analytics application started")
+    cache_service = CacheService.from_settings(settings)
+    application.state.cache_service = cache_service
+    application.state.cached_resource_loader = CachedResourceLoader(cache_service)
+    cache_status = await cache_service.status()
+    if cache_status == "unavailable":
+        logger.warning("event=cache_startup status=unavailable")
+    else:
+        logger.info("event=cache_startup status=%s", cache_status)
     try:
         async with httpx.AsyncClient(
             follow_redirects=False,
@@ -37,6 +51,7 @@ async def lifespan(application: FastAPI):
             application.state.baseball_provider = MLBProvider(client, settings)
             yield
     finally:
+        await cache_service.close()
         engine.dispose()
         logger.info("Outfield Analytics application stopped")
 
@@ -52,7 +67,7 @@ def create_app() -> FastAPI:
         },
     )
 
-    application.add_middleware(RequestLoggingMiddleware)
+    application.add_middleware(RequestErrorMiddleware)
     application.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -66,8 +81,12 @@ def create_app() -> FastAPI:
         RequestSecurityMiddleware,
         timeout=settings.request_timeout_seconds,
         requests_per_minute=settings.request_rate_limit_per_minute,
+        expensive_requests_per_minute=(
+            settings.expensive_request_rate_limit_per_minute
+        ),
     )
     application.add_middleware(SecurityHeadersMiddleware)
+    application.add_middleware(RequestLoggingMiddleware)
     application.add_exception_handler(Exception, handle_unexpected_error)
     application.add_exception_handler(RequestValidationError, handle_validation_error)
     application.add_exception_handler(ProviderError, handle_provider_error)
@@ -75,6 +94,8 @@ def create_app() -> FastAPI:
     application.include_router(teams.router, prefix="/api")
     application.include_router(players.router, prefix="/api")
     application.include_router(standings.router, prefix="/api")
+    if settings.environment != "production":
+        application.include_router(diagnostics.router, prefix="/api")
 
     return application
 

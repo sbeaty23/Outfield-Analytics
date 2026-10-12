@@ -9,6 +9,8 @@ class PublicConfigTests(unittest.TestCase):
 
     def test_example_connection_values_must_be_blank(self):
         self.assertTrue(violations(".env.example", "POSTGRES_USER=example"))
+        self.assertTrue(violations(".env.example", "REDIS_URL=redis://cache"))
+        self.assertTrue(violations(".env.example", "BACKEND_HOST=example.test"))
         self.assertFalse(
             violations(".env.example", "POSTGRES_USER=\nENVIRONMENT=development")
         )

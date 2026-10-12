@@ -77,3 +77,32 @@ def test_validation_does_not_echo_input() -> None:
 
     assert response.status_code == 422
     assert response.json() == {"detail": "Request validation failed"}
+
+
+def test_request_id_is_generated_returned_and_logged(caplog) -> None:
+    with (
+        caplog.at_level(logging.INFO, logger="app"),
+        TestClient(create_app()) as client,
+    ):
+        response = client.get("/api/does-not-exist")
+
+    request_id = response.headers["x-request-id"]
+    assert len(request_id) == 32
+    assert any(
+        getattr(record, "request_id", None) == request_id for record in caplog.records
+    )
+    assert "event=request_started" in caplog.text
+    assert "event=request_completed" in caplog.text
+
+
+def test_rate_limited_response_also_has_request_id(monkeypatch) -> None:
+    from app.core import config
+
+    monkeypatch.setattr(config.settings, "request_rate_limit_per_minute", 1)
+    app = create_app()
+    with TestClient(app) as client:
+        assert client.get("/api/does-not-exist").status_code == 404
+        response = client.get("/api/does-not-exist")
+
+    assert response.status_code == 429
+    assert len(response.headers["x-request-id"]) == 32

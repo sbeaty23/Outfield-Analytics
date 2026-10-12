@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import AsyncMock
 
 import httpx2 as httpx
 import pytest
@@ -8,6 +9,7 @@ from app.providers.exceptions import (
     ProviderError,
     ProviderNotFoundError,
     ProviderTimeoutError,
+    ProviderUnavailableError,
 )
 from app.providers.mlb import MLBProvider
 
@@ -216,3 +218,84 @@ def test_malformed_roster_is_not_treated_as_empty(payload):
 
     with pytest.raises(ProviderError):
         run_provider(handler, "get_roster", 110)
+
+
+def test_retryable_failures_use_exponential_backoff_then_succeed():
+    async def run():
+        attempts = 0
+        sleep = AsyncMock()
+
+        def handler(request):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise httpx.ReadTimeout("private")
+            if attempts == 2:
+                return httpx.Response(503)
+            return httpx.Response(200, json={"teams": [team_payload()]})
+
+        settings = Settings(
+            _env_file=None,
+            mlb_api_base_url="https://baseball.test/api/v1",
+            mlb_current_season=2026,
+            mlb_max_attempts=3,
+            mlb_retry_backoff_seconds=0.5,
+        )
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            result = await MLBProvider(client, settings, sleep=sleep).get_teams()
+        assert len(result.teams) == 1
+        assert attempts == 3
+        assert [call.args[0] for call in sleep.await_args_list] == [0.5, 1.0]
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("status", [429, 502, 503, 504])
+def test_retryable_status_exhaustion_is_unavailable(status):
+    attempts = 0
+
+    async def run():
+        nonlocal attempts
+
+        def handler(request):
+            nonlocal attempts
+            attempts += 1
+            return httpx.Response(status)
+
+        settings = Settings(
+            _env_file=None,
+            mlb_api_base_url="https://baseball.test/api/v1",
+            mlb_max_attempts=3,
+            mlb_retry_backoff_seconds=0,
+        )
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(ProviderUnavailableError):
+                await MLBProvider(client, settings).get_teams()
+
+    asyncio.run(run())
+    assert attempts == 3
+
+
+@pytest.mark.parametrize("status", [400, 404, 422, 500])
+def test_nonretryable_status_is_attempted_once(status):
+    attempts = 0
+
+    async def run():
+        nonlocal attempts
+
+        def handler(request):
+            nonlocal attempts
+            attempts += 1
+            return httpx.Response(status)
+
+        settings = Settings(
+            _env_file=None,
+            mlb_api_base_url="https://baseball.test/api/v1",
+            mlb_max_attempts=3,
+        )
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(ProviderError):
+                await MLBProvider(client, settings).get_teams()
+
+    asyncio.run(run())
+    assert attempts == 1

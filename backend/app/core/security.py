@@ -1,7 +1,9 @@
-"""Small security middleware suitable for the Phase 2 read-only API."""
+"""Security headers, request timeouts, and process-local API rate limits."""
 
 import asyncio
 from collections import defaultdict, deque
+from collections.abc import Callable
+from math import ceil
 from time import monotonic
 
 from fastapi.responses import JSONResponse
@@ -38,35 +40,84 @@ class SecurityHeadersMiddleware:
 
 class RequestSecurityMiddleware:
     def __init__(
-        self, app: ASGIApp, *, timeout: float, requests_per_minute: int
+        self,
+        app: ASGIApp,
+        *,
+        timeout: float,
+        requests_per_minute: int,
+        expensive_requests_per_minute: int = 30,
+        clock: Callable[[], float] = monotonic,
     ) -> None:
         self.app = app
         self.timeout = timeout
         self.requests_per_minute = requests_per_minute
-        self._requests: dict[str, deque[float]] = defaultdict(deque)
+        self.expensive_requests_per_minute = expensive_requests_per_minute
+        self._general: dict[str, deque[float]] = defaultdict(deque)
+        self._expensive: dict[str, deque[float]] = defaultdict(deque)
         self._lock = asyncio.Lock()
+        self._clock = clock
+        self._last_prune = 0.0
+
+    @staticmethod
+    def _is_expensive(path: str) -> bool:
+        return path == "/api/teams" or path.startswith(
+            ("/api/teams/", "/api/players/", "/api/standings")
+        )
+
+    @staticmethod
+    def _expire(requests: deque[float], now: float) -> None:
+        while requests and requests[0] <= now - 60:
+            requests.popleft()
+
+    def _prune_clients(self, now: float) -> None:
+        if now - self._last_prune < 60:
+            return
+        for buckets in (self._general, self._expensive):
+            for client_host, requests in list(buckets.items()):
+                self._expire(requests, now)
+                if not requests:
+                    buckets.pop(client_host, None)
+        self._last_prune = now
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
-        client = scope.get("client")
-        client_host = client[0] if client else "unknown"
-        now = monotonic()
-        async with self._lock:
-            requests = self._requests[client_host]
-            while requests and requests[0] <= now - 60:
-                requests.popleft()
-            if len(requests) >= self.requests_per_minute:
+        path = scope.get("path", "")
+        if path == "/api" or path.startswith("/api/"):
+            client = scope.get("client")
+            client_host = client[0] if client else "unknown"
+            now = self._clock()
+            retry_after = 0
+            async with self._lock:
+                self._prune_clients(now)
+                general = self._general[client_host]
+                self._expire(general, now)
+                expensive = self._expensive[client_host]
+                self._expire(expensive, now)
+
+                if len(general) >= self.requests_per_minute:
+                    retry_after = max(retry_after, ceil(60 - (now - general[0])))
+                is_expensive = self._is_expensive(path)
+                if (
+                    is_expensive
+                    and len(expensive) >= self.expensive_requests_per_minute
+                ):
+                    retry_after = max(retry_after, ceil(60 - (now - expensive[0])))
+                if not retry_after:
+                    general.append(now)
+                    if is_expensive:
+                        expensive.append(now)
+
+            if retry_after:
                 response = JSONResponse(
                     status_code=429,
-                    content={"detail": "Too many requests"},
-                    headers={"Retry-After": "60"},
+                    content={"detail": "Rate limit exceeded. Try again later."},
+                    headers={"Retry-After": str(max(1, retry_after))},
                 )
                 await response(scope, receive, send)
                 return
-            requests.append(now)
 
         response_started = False
 

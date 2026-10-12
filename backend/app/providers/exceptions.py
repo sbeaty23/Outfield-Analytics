@@ -5,7 +5,11 @@ class ProviderError(Exception):
     """Upstream unavailable or returned an invalid response."""
 
 
-class ProviderTimeoutError(ProviderError):
+class ProviderUnavailableError(ProviderError):
+    """The upstream is temporarily unavailable."""
+
+
+class ProviderTimeoutError(ProviderUnavailableError):
     """The upstream request exceeded its timeout."""
 
 

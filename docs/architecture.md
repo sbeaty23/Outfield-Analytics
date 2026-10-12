@@ -7,6 +7,7 @@
 | Frontend | Next.js / React, TypeScript, Tailwind CSS | Serve the UI and display API health. |
 | Backend | FastAPI, Pydantic, SQLAlchemy | Validate requests, return JSON, and access the database. |
 | Database | PostgreSQL 17 | Persist application data; Alembic manages schema migrations. |
+| Cache | Redis | Store disposable normalized current-season responses. |
 | Communication | REST over HTTP, JSON | Connect the frontend to the backend. |
 
 ```text
@@ -58,12 +59,14 @@ responses. CORS preflight responses are handled separately by middleware.
 
 ## Local runtime and configuration
 
-Docker Compose runs `frontend`, `backend`, and `db`, plus short-lived role
+Docker Compose runs `frontend`, `backend`, `db`, and private disposable `redis`, plus short-lived role
 provisioning and migration services. The read-only backend starts only after
 role provisioning and `alembic upgrade head` complete. Manual team synchronization
 runs in its own profile with a non-superuser write role. The frontend waits for
 backend health. PostgreSQL data lives in the named
 `postgres_data` volume; normal `docker compose down` preserves it.
+Redis has no host-published port or persistent volume. Losing Redis removes only
+cached data; the backend continues through the provider in degraded mode.
 
 The frontend and backend share the edge network; only the backend, database, and
 short-lived database jobs join the private data network. Published web ports bind
@@ -132,6 +135,41 @@ missing statistics and empty statistical splits remain null, not invented zeros.
 See [Phase 2 verification](phase2-verification.md) for the full endpoint table,
 configuration, sync commands, and live acceptance results.
 
+## Phase 3 reliability layer
+
+Current-season service reads use this flow:
+
+```text
+FastAPI route
+   -> service
+   -> fresh normalized cache hit -> response
+   -> miss/stale -> process-local single flight -> MLBProvider
+   -> normalized result -> Redis -> response
+   -> temporary MLB failure + valid stale value -> stale response
+```
+
+Cache keys include the application namespace, provider, schema version, season,
+resource identifiers, statistic group, and schedule dates. Cache envelopes keep
+fetch and freshness timestamps internally; public baseball response models are
+unchanged. Redis read/write failures are logged and bypassed.
+
+`MLBProvider` performs at most three attempts for timeouts, transport failures,
+and selected temporary HTTP statuses, with bounded exponential backoff. It does
+not retry not-found, other client errors, invalid payloads, or oversized
+responses. Provider-unavailable failures can use stale data; malformed or
+not-found responses cannot.
+
+Incoming `/api` requests have a process-local direct-peer budget, with a lower
+budget for team, player, and standings resources. Forwarded client-address
+headers are deliberately ignored until a deployment has a trusted proxy
+boundary. Request IDs correlate route timing, cache decisions, provider attempts,
+and sanitized errors. Development and test environments expose
+`GET /api/diagnostics`; production does not. The existing database-aware
+`GET /api/health` contract remains unchanged.
+
+See [caching](caching.md), [reliability](reliability.md), and
+[Phase 3 verification](phase3-verification.md).
+
 ## Verification
 
 [CI](../.github/workflows/ci.yml) runs frontend install, lint, format checks,
@@ -145,7 +183,6 @@ and the first milestone checklist.
 
 ## Planned extensions
 
-- Redis for caching provider responses and computed results.
 - Retrosheet ingestion into PostgreSQL for historical analysis, with attribution.
 - Analytics and ML jobs for features, chronological evaluation, model versions,
   and game predictions.

@@ -16,15 +16,18 @@ _CREDENTIAL_FIELDS = {
     "POSTGRES_APP_PASSWORD",
     "POSTGRES_SYNC_USER",
     "POSTGRES_SYNC_PASSWORD",
+    "REDIS_URL",
 }
 _CREDENTIAL_SUFFIXES = ("_API_KEY", "_PASSWORD", "_SECRET", "_TOKEN")
+_CONNECTION_SUFFIXES = ("_URL", "_HOST", "_HOSTS", "_PORT")
 _ASSIGNMENT = re.compile(
     r"^\s*[\"']?(?P<name>[A-Z][A-Z0-9_]*)[\"']?\s*[:=]\s*(?P<value>.*?)\s*$"
 )
 _IPV4 = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
 _IPV6_LOOPBACK = re.compile(r"\[\s*:{2}\s*1\s*\]")
 _NUMERIC_PORT_ASSIGNMENT = re.compile(
-    r"^\s*[A-Z][A-Z0-9_]*PORT[A-Z0-9_]*\s*[:=]\s*[\"']?\d+[\"']?\s*$",
+    r"^\s*(?:PORT|[A-Z][A-Z0-9_]*_PORT(?:_[A-Z0-9_]+)?)"
+    r"\s*[:=]\s*[\"']?\d+[\"']?\s*$",
     re.MULTILINE,
 )
 _NUMERIC_URL_PORT = re.compile(r"[a-z][a-z0-9+.-]*://[^\s/:]+:\d+(?:[/\s]|$)")
@@ -33,6 +36,10 @@ _URL_CREDENTIALS = re.compile(r"[a-z][a-z0-9+.-]*://[^\s/:]+:[^\s/@]+@")
 
 def _is_credential_field(name: str) -> bool:
     return name in _CREDENTIAL_FIELDS or name.endswith(_CREDENTIAL_SUFFIXES)
+
+
+def _is_connection_field(name: str) -> bool:
+    return _is_credential_field(name) or name.endswith(_CONNECTION_SUFFIXES)
 
 
 def _is_environment_reference(value: str) -> bool:
@@ -59,13 +66,14 @@ def _content_violations(path: str, content: str) -> list[str]:
             continue
         name = match.group("name")
         value = match.group("value").strip()
-        if not value or not _is_credential_field(name):
+        if not value or not _is_connection_field(name):
             continue
         if filename.endswith(".env.example"):
             findings.append(
-                f"{normalized_path}:{line_number}: credential field {name} must be blank"
+                f"{normalized_path}:{line_number}: connection or credential field "
+                f"{name} must be blank"
             )
-        elif not _is_environment_reference(value):
+        elif _is_credential_field(name) and not _is_environment_reference(value):
             findings.append(
                 f"{normalized_path}:{line_number}: literal credential in {name}"
             )
@@ -99,9 +107,19 @@ def violations(path: str | None = None, content: str | None = None) -> list[str]
 
     compose_path = ROOT / "docker-compose.yml"
     compose = compose_path.read_text(encoding="utf-8")
-    db_block = compose.split("  backend:", 1)[0]
-    if "    ports:" in db_block:
+    def service_block(name: str) -> str:
+        match = re.search(
+            rf"(?ms)^  {re.escape(name)}:\s*$.*?(?=^  [a-zA-Z0-9_-]+:\s*$|\Z)",
+            compose,
+        )
+        return match.group(0) if match else ""
+
+    if "    ports:" in service_block("db"):
         findings.append("PostgreSQL must not publish host ports")
+    if not service_block("redis"):
+        findings.append("Compose must define a Redis service")
+    elif "    ports:" in service_block("redis"):
+        findings.append("Redis must not publish host ports")
     if "env_file:" in compose:
         findings.append("Compose services must receive only explicitly listed settings")
     if '"${BACKEND_BIND_HOST}:${BACKEND_PORT}:${BACKEND_PORT}"' not in compose:
